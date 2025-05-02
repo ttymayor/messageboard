@@ -1,15 +1,30 @@
 package main
 
 import (
+	"os"
+
+	"messageboard/models"
 	"messageboard/routers"
 )
 
 func main() {
-	// Initialize the router
-	r := routers.InitRouter()
+	// 初始化資料庫
+	models.InitDB()
 
-	// Start the server on port 8080
-	if err := r.Run(":8080"); err != nil {
+	// 設定環境模式與監聽位址
+	env := os.Getenv("APP_ENV")
+	var addr string
+	if env == "dev" {
+		addr = "127.0.0.1:8080"
+	} else {
+		addr = ":8080"
+	}
+
+	// 啟動服務
+	// 註冊路由
+	r := routers.SetupRouter()
+	// 設定監聽的端口
+	if err := r.Run(addr); err != nil {
 		panic(err)
 	}
 }
