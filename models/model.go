@@ -15,6 +15,7 @@ var DB *sql.DB
 type Comment struct {
 	ID        int    `json:"id"`
 	Author    string `json:"author"`
+	Email     string `json:"email"`
 	Content   string `json:"content"`
 	CreatedAt string `json:"created_at"`
 }
@@ -75,6 +76,7 @@ func creatTable() {
 	* id 欄位為主鍵，使用自動遞增的整數
 	* author 欄位用來存放留言者的名稱
 	* content 欄位用來存放留言內容
+	* email 欄位用來存放留言者的電子郵件
 	* created_at 欄位用來存放留言的時間戳
 	 */
 
@@ -82,6 +84,7 @@ func creatTable() {
 	CREATE TABLE IF NOT EXISTS comments (
 		id SERIAL PRIMARY KEY,
 		author TEXT NOT NULL,
+		email TEXT NOT NULL,
 		content TEXT NOT NULL,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
