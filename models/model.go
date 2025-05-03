@@ -1,23 +1,43 @@
 package models
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
-	_ "github.com/lib/pq"
+	"golang.org/x/crypto/bcrypt"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
-var DB *sql.DB
+var DB *gorm.DB
 
 type Comment struct {
-	ID        int    `json:"id"`
-	Author    string `json:"author"`
-	Email     string `json:"email"`
-	Content   string `json:"content"`
-	CreatedAt string `json:"created_at"`
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	UserID    uint      `gorm:"not null" json:"user_id"`       // 外鍵
+	User      User      `gorm:"foreignKey:UserID" json:"user"` // 關聯
+	Content   string    `gorm:"not null" json:"content"`
+	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
+}
+
+type User struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	Username  string    `gorm:"not null" json:"username"`
+	Email     string    `gorm:"not null" json:"email"`
+	Password  string    `gorm:"not null" json:"password"`
+	RoleID    uint      `gorm:"not null" json:"role_id"`       // 外鍵
+	Role      Role      `gorm:"foreignKey:RoleID" json:"role"` // 關聯
+	LastLogin time.Time `json:"last_login"`
+	UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
+}
+
+type Role struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	RoleName  string    `gorm:"not null" json:"role_name"`
+	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
 }
 
 func InitDB() {
@@ -35,61 +55,89 @@ func InitDB() {
 	dbname := os.Getenv("DB_NAME")
 	sslmode := os.Getenv("DB_SSLMODE")
 
-	// 建立資料庫連線字串
+	// 建立 DSN 並連接資料庫
 	dsn := fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		host, port, user, password, dbname, sslmode,
 	)
 
-	// 連接資料庫
-	DB, err = sql.Open("postgres", dsn)
-	if err != nil {
-		log.Fatal("無法連接到資料庫：", err)
-	}
-
-	// 測試資料庫連線
-	err = DB.Ping()
+	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Fatal("無法連接到資料庫：", err)
 	}
 
 	log.Println("成功連接到資料庫")
 
-	// 建立留言資料表
-	creatTable()
-	log.Println("成功建立留言資料表")
+	// 僅開發環境下 drop table
+	if os.Getenv("APP_ENV") == "dev" {
+		DB.Migrator().DropTable(&Comment{}, &User{}, &Role{})
+		log.Println("已刪除舊資料表")
+	}
 
-	// // 建立索引
-	// // 如果資料量很大，建議使用批次建立索引
-	// _, err = DB.Exec(`CREATE INDEX IF NOT EXISTS idx_comments_created_at ON comments (created_at DESC);`)
-	// if err != nil {
-	// 	log.Fatal("無法建立索引：", err)
-	// }
-	// log.Println("成功建立索引")
+	// 自動建立資料表
+	if err := DB.AutoMigrate(&User{}, &Role{}, &Comment{}); err != nil {
+		log.Fatal("自動建立資料表失敗：", err)
+	}
+	log.Println("成功建立資料表")
 
+	// 初始化預設角色
+	InitRole()
+
+	// 初始化預設使用者
+	InitUser()
 }
 
-func creatTable() {
-	/*
-	* 建立留言資料表
-	* 表格名稱為 comments
-	* id 欄位為主鍵，使用自動遞增的整數
-	* author 欄位用來存放留言者的名稱
-	* content 欄位用來存放留言內容
-	* email 欄位用來存放留言者的電子郵件
-	* created_at 欄位用來存放留言的時間戳
-	 */
+// 初始化身分
+func InitRole() {
+	// 建立預設角色
+	var roles = []Role{
+		{RoleName: "reader"},
+		{RoleName: "admin"},
+		{RoleName: "author"},
+	}
 
-	_, err := DB.Exec(`
-	CREATE TABLE IF NOT EXISTS comments (
-		id SERIAL PRIMARY KEY,
-		author TEXT NOT NULL,
-		email TEXT NOT NULL,
-		content TEXT NOT NULL,
-		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-	);
-	`)
-	if err != nil {
-		log.Fatal("無法建立資料表：", err)
+	// 檢查角色是否存在，如果不存在則建立
+	for _, role := range roles {
+		var count int64
+		DB.Model(&Role{}).Where("role_name = ?", role.RoleName).Count(&count)
+		if count == 0 {
+			if err := DB.Create(&role).Error; err != nil {
+				log.Fatal("建立預設角色失敗：", err)
+			}
+			log.Printf("成功建立角色：%s\n", role.RoleName)
+		} else {
+			log.Printf("角色已存在：%s\n", role.RoleName)
+		}
+	}
+}
+
+// 初始化預設使用者
+func InitUser() {
+	// 建立預設使用者
+	var users = []User{{
+		Username: os.Getenv("AUTHOR_USERNAME"),
+		Email:    os.Getenv("AUTHOR_EMAIL"),
+		Password: os.Getenv("AUTHOR_PASSWORD"),
+		RoleID:   3,
+	}}
+
+	for _, user := range users {
+		var count int64
+		DB.Model(&User{}).Where("email = ?", user.Email).Count(&count)
+		if count == 0 {
+			// 密碼加密
+			hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+			if err != nil {
+				log.Fatal("密碼加密失敗：", err)
+			}
+			user.Password = string(hashedPassword)
+
+			if err := DB.Create(&user).Error; err != nil {
+				log.Fatal("建立預設使用者失敗：", err)
+			}
+			log.Printf("成功建立使用者：%s\n", user.Username)
+		} else {
+			log.Printf("使用者已存在：%s\n", user.Username)
+		}
 	}
 }
