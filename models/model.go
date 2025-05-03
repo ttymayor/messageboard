@@ -16,8 +16,11 @@ var DB *gorm.DB
 
 type Comment struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
-	UserID    uint      `gorm:"not null" json:"user_id"`       // 外鍵
-	User      User      `gorm:"foreignKey:UserID" json:"user"` // 關聯
+	ParentID  *uint     `json:"parent_id"`                          // 外鍵
+	Parent    *Comment  `gorm:"foreignKey:ParentID" json:"parent"`  // 關聯
+	Replies   []Comment `gorm:"foreignKey:ParentID" json:"replies"` // 子留言，一對多
+	UserID    uint      `gorm:"not null" json:"user_id"`            // 外鍵
+	User      User      `gorm:"foreignKey:UserID" json:"user"`      // 關聯
 	Content   string    `gorm:"not null" json:"content"`
 	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
 }

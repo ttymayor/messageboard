@@ -17,7 +17,8 @@ import (
 
 func CreateComment(c *gin.Context) {
 	var input struct {
-		Content string `json:"content" binding:"required"`
+		Content  string `json:"content" binding:"required"`
+		ParentID *uint  `json:"parent_id"` // 可選，若為 nil 則表示為根留言
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "參數錯誤"})
@@ -32,23 +33,37 @@ func CreateComment(c *gin.Context) {
 	}
 	user := userInterface.(models.User)
 
+	// 如果是回覆，確認父留言是否存在
+	if input.ParentID != nil {
+		var parentComment models.Comment
+		if err := models.DB.First(&parentComment, *input.ParentID).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "找不到要回覆的留言"})
+			return
+		}
+	}
+
+	// 建立留言
 	comment := models.Comment{
-		Content: input.Content,
-		UserID:  user.ID,
+		Content:  input.Content,
+		UserID:   user.ID,
+		ParentID: input.ParentID, // nil 表示主留言
 	}
 	if err := models.DB.Create(&comment).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "建立留言失敗"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "建立留言失敗", "details": err.Error()})
 		return
 	}
 
-	// 寄送通知信
+	// 寄送通知信（可選）
 	if err := sendEmailNotification(comment); err != nil {
 		log.Printf("寄送通知信失敗: %v\n", err)
 	} else {
 		log.Printf("成功寄送通知信給 %s\n", comment.User.Username)
 	}
 
-	c.JSON(http.StatusOK, comment)
+	c.JSON(http.StatusOK, gin.H{
+		"message": "留言成功",
+		"comment": comment,
+	})
 }
 
 func GetComments(c *gin.Context) {
@@ -175,7 +190,10 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"token": tokenString})
+	c.JSON(http.StatusOK, gin.H{
+		"message": "登入成功",
+		"token":   tokenString,
+	})
 }
 
 func sendEmailNotification(comment models.Comment) error {
