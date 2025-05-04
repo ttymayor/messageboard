@@ -5,6 +5,7 @@ import (
 	"log"
 	"messageboard/models"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"time"
@@ -17,6 +18,7 @@ import (
 
 func CreateComment(c *gin.Context) {
 	var input struct {
+		URL      string `json:"url" binding:"required"` // 留言的網址
 		Content  string `json:"content" binding:"required"`
 		ParentID *uint  `json:"parent_id"` // 可選，若為 nil 則表示為根留言
 	}
@@ -42,11 +44,19 @@ func CreateComment(c *gin.Context) {
 		}
 	}
 
+	// 檢查 URL 是否有效
+	u, err := url.ParseRequestURI(input.URL)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "網址格式錯誤"})
+		return
+	}
+
 	// 建立留言
 	comment := models.Comment{
-		Content:  input.Content,
-		UserID:   user.ID,
+		URL:      input.URL,
 		ParentID: input.ParentID, // nil 表示主留言
+		UserID:   user.ID,
+		Content:  input.Content,
 	}
 	if err := models.DB.Create(&comment).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "建立留言失敗", "details": err.Error()})
@@ -212,14 +222,38 @@ func sendEmailNotification(comment models.Comment) error {
 	}
 
 	email := mail.NewMSG()
-	email.SetFrom(os.Getenv("MAIL_FROM")).
-		AddTo(os.Getenv("MAIL_TO")).
-		SetSubject("【留言通知】你有一則新留言")
+	var toEmail string
+	var subject string
 
-	body := fmt.Sprintf("作者：%s\n內容：\n%s\n時間：%s",
+	// 如果是回覆留言，通知父留言的作者
+	if comment.ParentID != nil {
+		var parentComment models.Comment
+		if err := models.DB.Preload("User").First(&parentComment, *comment.ParentID).Error; err == nil && parentComment.User.Email != "" {
+			toEmail = parentComment.User.Email
+			subject = "【留言通知】你有一則新回覆"
+		} else {
+			// 找不到父留言或父留言作者沒信箱，通知自己
+			toEmail = comment.User.Email
+			subject = "【留言通知】你有一則新留言"
+		}
+	} else {
+		// 主留言通知站長
+		toEmail = os.Getenv("MAIL_TO")
+		if toEmail == "" {
+			toEmail = comment.User.Email
+		}
+		subject = "【留言通知】你有一則新留言"
+	}
+
+	email.SetFrom(os.Getenv("MAIL_FROM")).
+		AddTo(toEmail).
+		SetSubject(subject)
+
+	body := fmt.Sprintf("```markdown\n## 作者：%s\n## 時間：%s\n## 內容：\n%s\n```",
 		comment.User.Username,
+		comment.CreatedAt.Format("2006-01-02 15:04:05"),
 		comment.Content,
-		comment.CreatedAt.Format("2006-01-02 15:04:05"))
+	)
 
 	email.SetBody(mail.TextPlain, body)
 
