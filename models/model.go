@@ -15,15 +15,25 @@ import (
 var DB *gorm.DB
 
 type Comment struct {
+	ID        uint          `gorm:"primaryKey" json:"id"`
+	URL       string        `gorm:"not null;index" json:"url"`                        // 留言的網址
+	ParentID  *uint         `json:"parent_id"`                                        // 外鍵	Parent
+	Parent    *Comment      `gorm:"foreignKey:ParentID;references:ID" json:"parent"`  // 父留言，一對多
+	Replies   []Comment     `gorm:"foreignKey:ParentID;references:ID" json:"replies"` // 子留言，一對多
+	UserID    uint          `gorm:"not null" json:"user_id"`                          // 外鍵
+	User      User          `gorm:"foreignKey:UserID" json:"user"`                    // 關聯
+	Likes     []CommentLike `gorm:"foreignKey:CommentID" json:"likes,omitempty"`
+	Content   string        `gorm:"not null" json:"content"`
+	CreatedAt time.Time     `gorm:"autoCreateTime" json:"created_at"`
+}
+
+type CommentLike struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
-	URL       string    `gorm:"not null;index" json:"url"`                        // 留言的網址
-	ParentID  *uint     `json:"parent_id"`                                        // 外鍵	Parent
-	Parent    *Comment  `gorm:"foreignKey:ParentID;references:ID" json:"parent"`  // 父留言，一對多
-	Replies   []Comment `gorm:"foreignKey:ParentID;references:ID" json:"replies"` // 子留言，一對多
-	UserID    uint      `gorm:"not null" json:"user_id"`                          // 外鍵
-	User      User      `gorm:"foreignKey:UserID" json:"user"`                    // 關聯
-	Content   string    `gorm:"not null" json:"content"`
-	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UserID    uint      `gorm:"not null;uniqueIndex:idx_user_comment"` // 外鍵: 使用者
+	User      User      `gorm:"foreignKey:UserID" json:"user"`         // 關聯
+	CommentID uint      `gorm:"not null;uniqueIndex:idx_user_comment"` // 外鍵: 留言
+	Comment   Comment   `gorm:"foreignKey:CommentID" json:"comment"`   // 關聯
+	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`      // 點讚時間
 }
 
 type User struct {
@@ -74,12 +84,12 @@ func InitDB() {
 
 	// 僅開發環境下 drop table
 	if os.Getenv("APP_ENV") == "dev" {
-		DB.Migrator().DropTable(&Comment{}, &User{}, &Role{})
+		DB.Migrator().DropTable(&Comment{}, &User{}, &Role{}, &CommentLike{})
 		log.Println("已刪除舊資料表")
 	}
 
 	// 自動建立資料表
-	if err := DB.AutoMigrate(&User{}, &Role{}, &Comment{}); err != nil {
+	if err := DB.AutoMigrate(&User{}, &Role{}, &Comment{}, &CommentLike{}); err != nil {
 		log.Fatal("自動建立資料表失敗：", err)
 	}
 	log.Println("成功建立資料表")

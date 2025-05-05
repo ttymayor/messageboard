@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"fmt"
 	"log"
 	"messageboard/models"
 	"net/http"
@@ -11,10 +10,15 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 	mail "github.com/xhit/go-simple-mail/v2"
-	"golang.org/x/crypto/bcrypt"
 )
+
+/*
+* Comment
+*
+* CreateComment, GetComments, DeleteComment, GetCommentByID, ToggleCommentLike
+* 這些函數處理留言的建立、查詢、刪除和點讚功能
+ */
 
 func CreateComment(c *gin.Context) {
 	var input struct {
@@ -82,7 +86,10 @@ func GetComments(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "查詢留言失敗: " + err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, comments)
+	c.JSON(http.StatusOK, gin.H{
+		"message":  "查詢成功",
+		"comments": comments,
+	})
 }
 
 func DeleteComment(c *gin.Context) {
@@ -101,108 +108,92 @@ func GetCommentByID(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "查詢留言失敗: " + err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, comment)
-}
-
-/*
-* Auth
-*
-* Register, Login
- */
-func Register(c *gin.Context) {
-	var input struct {
-		Username string `json:"username" binding:"required,min=3,max=20"`
-		Email    string `json:"email" binding:"required,email"`
-		Password string `json:"password" binding:"required,min=6,max=20"`
-	}
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "格式錯誤或欄位缺失"})
-		return
-	}
-
-	// 檢查 email 是否已存在
-	var existing models.User
-	if err := models.DB.Where("email = ?", input.Email).First(&existing).Error; err == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "此 Email 已被註冊"})
-		return
-	}
-
-	// 密碼加密
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "密碼加密失敗"})
-		return
-	}
-
-	newUser := models.User{
-		Username: input.Username,
-		Email:    input.Email,
-		Password: string(hashedPassword),
-		RoleID:   1, // 預設 Reader 角色
-	}
-
-	if err := models.DB.Create(&newUser).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "註冊失敗"})
-		return
-	}
-
 	c.JSON(http.StatusOK, gin.H{
-		"message": "註冊成功",
-		"user": gin.H{
-			"id":       newUser.ID,
-			"username": newUser.Username,
-			"email":    newUser.Email,
-			"role_id":  newUser.RoleID,
-		},
+		"message": "查詢成功",
+		"comment": comment,
 	})
 }
 
-func Login(c *gin.Context) {
-	var input struct {
-		Email    string `json:"email" binding:"required,email"`
-		Password string `json:"password" binding:"required"`
+func GetCommentsByURL(c *gin.Context) {
+	url := c.Param("url")
+	var comments []models.Comment
+	if err := models.DB.Where("url = ?", url).Preload("User").Find(&comments).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "查詢留言失敗: " + err.Error()})
+		return
 	}
+	c.JSON(http.StatusOK, gin.H{
+		"message":  "查詢成功",
+		"comments": comments,
+	})
+}
 
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "參數格式錯誤"})
+func ToggleCommentLike(c *gin.Context) {
+	commentID := c.Param("id")
+
+	// 取得目前登入的使用者
+	userInterface, exists := c.Get("currentUser")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "使用者未登入"})
+		return
+	}
+	user := userInterface.(models.User)
+
+	// 檢查留言是否存在
+	var comment models.Comment
+	if err := models.DB.First(&comment, commentID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "留言不存在"})
 		return
 	}
 
-	var user models.User
-	if err := models.DB.Where("email = ?", input.Email).First(&user).Error; err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "使用者不存在"})
+	// 檢查是否已經點過讚
+	var existingLike models.CommentLike
+	err := models.DB.
+		Where("user_id = ? AND comment_id = ?", user.ID, comment.ID).
+		First(&existingLike).Error
+
+	if err == nil {
+		// 已點過讚 → 取消讚
+		if err := models.DB.Delete(&existingLike).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "取消讚失敗", "details": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "已取消讚"})
 		return
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "密碼錯誤"})
+	// 未點過讚 → 新增讚
+	newLike := models.CommentLike{
+		UserID:    user.ID,
+		CommentID: comment.ID,
+	}
+	if err := models.DB.Create(&newLike).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "點讚失敗", "details": err.Error()})
 		return
 	}
 
-	// 產生 JWT Token
-	// 設定 Token 的過期時間為 72 小時
-	claims := models.AppClaims{ // 使用自訂 struct
-		UserID: user.ID,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(72 * time.Hour)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			NotBefore: jwt.NewNumericDate(time.Now()),
-			// Issuer:    "your_app_name", // 可選
-			// Subject:   strconv.FormatUint(uint64(user.ID), 10), // 可選
-		},
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims) // 傳入 claims struct
+	c.JSON(http.StatusOK, gin.H{"message": "點讚成功"})
+}
 
-	// 簽署 Token
-	tokenString, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "產生 token 失敗"})
+func GetCommentLikes(c *gin.Context) {
+	commentID := c.Param("id")
+
+	// 檢查留言是否存在
+	var comment models.Comment
+	if err := models.DB.First(&comment, commentID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "留言不存在"})
+		return
+	}
+
+	var likes []models.CommentLike
+	if err := models.DB.Where("comment_id = ?", comment.ID).Find(&likes).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "查詢點讚失敗", "details": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "登入成功",
-		"token":   tokenString,
+		"comment_id":  comment.ID,
+		"likes_count": len(likes),
+		"likes":       likes,
 	})
 }
 
@@ -249,13 +240,27 @@ func sendEmailNotification(comment models.Comment) error {
 		AddTo(toEmail).
 		SetSubject(subject)
 
-	body := fmt.Sprintf("```markdown\n## 作者：%s\n## 時間：%s\n## 內容：\n%s\n```",
-		comment.User.Username,
-		comment.CreatedAt.Format("2006-01-02 15:04:05"),
-		comment.Content,
-	)
+	// htmlBody := fmt.Sprintf("```markdown\n## 作者：%s\n## 時間：%s\n## 內容：\n%s\n```",
+	// 	comment.User.Username,
+	// 	comment.CreatedAt.Format("2006-01-02 15:04:05"),
+	// 	comment.Content,
+	// )
 
-	email.SetBody(mail.TextPlain, body)
+	htmlBody := `
+		<html>
+		<body>
+			<h2>留言通知</h2>
+			<p>作者：` + comment.User.Username + `</p>
+			<p>時間：` + comment.CreatedAt.Format("2006-01-02 15:04:05") + `</p>
+			<p>▼▼▼內容如下▼▼▼</p>
+			<p>` + comment.Content + `</p>
+			<p>網址：<a href="` + comment.URL + `">` + comment.URL + `</a></p>
+			<br>
+			<p>感謝您的留言！</p>
+		</html>
+		`
+
+	email.SetBody(mail.TextHTML, htmlBody)
 
 	return email.Send(smtpClient)
 }

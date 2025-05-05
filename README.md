@@ -29,9 +29,14 @@
 │   README.md
 │
 ├───controllers
-│       controller.go
+│       auth.go
+│       comment.go
+│
+├───middlewares
+│       middleware.go
 │
 ├───models
+│       auth.go
 │       model.go
 │
 └───routers
@@ -59,8 +64,13 @@
 
 - [x] ~~支援回覆功能~~ (Done)
 - [x] ~~支援篩選每篇文章的留言~~ (Done)
-- [ ] 支援點讚與作者已讀紀錄
+- [x] 支援點讚 (Done)
+- [ ] 支援點讚 Email 通知
+- [ ] 支援編輯留言
 - [ ] 支援隱藏留言
+- [ ] 支援檢舉留言
+- [ ] 支援不接收 Email 通知
+- [ ] 支援 CAPTCHA 防刷機制
 - [ ] 支援圖片或 Emoji 及 gif 等...
 
 ### 前端（可能另開 Repo）：

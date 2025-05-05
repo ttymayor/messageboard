@@ -19,10 +19,20 @@ func SetupRouter() *gin.Engine {
 
 	// Protected routes
 	authGroup := v1.Group("/")
-	authGroup.Use(middleware.JWTAuth()) // JWT 認證中介軟體
-	authGroup.POST("/comments", controllers.CreateComment)
+	authGroup.Use(middleware.JWTAuth())
+
+	// Comment routes
 	authGroup.GET("/comments", controllers.GetComments)
+	authGroup.POST("/comments", controllers.CreateComment)
+	authGroup.GET("/comments/:id", controllers.GetCommentByID)
 	authGroup.DELETE("/comments/:id", controllers.DeleteComment)
+
+	// Like routes
+	authGroup.POST("/comments/:id/like", controllers.ToggleCommentLike)
+	authGroup.GET("/comments/:id/likes", controllers.GetCommentLikes)
+
+	// Get comments by URL
+	authGroup.GET("/comments/:url", controllers.GetCommentsByURL)
 
 	// Test route
 	r.GET("/", func(c *gin.Context) {
