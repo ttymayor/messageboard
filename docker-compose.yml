@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  # PostgreSQL 數據庫服務
+  postgres:
+    image: postgres:latest
+    container_name: messageboard-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - messageboard-network
+
+  # 留言板應用服務
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: messageboard-app
+    restart: always
+    depends_on:
+      - postgres
+    environment:
+      # 數據庫配置
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_SSLMODE: disable
+      # 應用配置
+      APP_ENV: ${APP_ENV:-prod}
+      # JWT 配置
+      JWT_SECRET: ${JWT_SECRET}
+      # 作者配置
+      AUTHOR_USERNAME: ${AUTHOR_USERNAME}
+      AUTHOR_EMAIL: ${AUTHOR_EMAIL}
+      AUTHOR_PASSWORD: ${AUTHOR_PASSWORD}
+      # 郵件配置（可選）
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      MAIL_FROM: ${MAIL_FROM}
+      MAIL_TO: ${MAIL_TO}
+    ports:
+      - "8080:8080"
+    networks:
+      - messageboard-network
+
+networks:
+  messageboard-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

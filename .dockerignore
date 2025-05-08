@@ -1,0 +1,27 @@
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# 編譯產物和臨時文件
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# 環境變數文件（僅排除範例文件，實際的 .env 文件會被複製到容器中）
+.env.example
+
+# 其他不需要的文件
+README.md
+README.md.docker
+
+# 依賴目錄（會在構建過程中重新下載）
+vendor/

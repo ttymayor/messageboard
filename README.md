@@ -5,10 +5,11 @@
 ## Feature
 
 - 獲得留言後，傳送 Email 通知（可選）
+- 支援 Docker 部署
 
 ## 關於 Repo
 
-### 如何使用
+### 使用方法一：直接運行
 
 1. 確保已有 `Golang` 環境
 2. 複製一份 `.env.example` 重新命名為 `.env` 並配置其中訊息
@@ -17,12 +18,24 @@
     go run .
     ```
 
+### 使用方法二：使用 Docker
+
+1. 確保已安裝 `Docker` 和 `Docker Compose`
+2. 複製一份 `.env.example` 重新命名為 `.env` 並配置其中訊息
+3. 使用 Docker Compose 啟動應用
+    ```
+    docker-compose up -d
+    ```
+4. 應用將在 `http://localhost:8080` 運行
+
 ### 檔案結構
 
 ```
 .
 │   .env.example
 │   .gitignore
+│   docker-compose.yml
+│   Dockerfile
 │   go.mod
 │   go.sum
 │   main.go
@@ -54,7 +67,7 @@
 
 ### 專案
 
-- [ ] 支援 Docker 部屬
+- [x] 支援 Docker 部屬
 
 ### 後端
 
