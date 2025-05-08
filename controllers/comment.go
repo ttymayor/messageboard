@@ -32,12 +32,7 @@ func CreateComment(c *gin.Context) {
 	}
 
 	// 驗證使用者是否登入
-	userInterface, exists := c.Get("currentUser")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "使用者未登入"})
-		return
-	}
-	user := userInterface.(models.User)
+	user := c.MustGet("currentUser").(models.User)
 
 	// 如果是回覆，確認父留言是否存在
 	if input.ParentID != nil {
@@ -80,6 +75,44 @@ func CreateComment(c *gin.Context) {
 	})
 }
 
+func UpdateComment(c *gin.Context) {
+	id := c.Param("id")
+	var input struct {
+		Content string `json:"content" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "參數錯誤"})
+		return
+	}
+
+	// 驗證使用者是否登入
+	user := c.MustGet("currentUser").(models.User)
+
+	// 查詢留言
+	var comment models.Comment
+	if err := models.DB.First(&comment, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "留言不存在"})
+		return
+	}
+
+	// 確認使用者是否為留言作者
+	if comment.UserID != user.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "無權限修改此留言"})
+		return
+	}
+
+	comment.Content = input.Content
+	if err := models.DB.Save(&comment).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新留言失敗", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "更新成功",
+		"comment": comment,
+	})
+}
+
 func GetComments(c *gin.Context) {
 	var comments []models.Comment
 	if err := models.DB.Preload("User").Order("created_at DESC").Find(&comments).Error; err != nil {
@@ -115,7 +148,11 @@ func GetCommentByID(c *gin.Context) {
 }
 
 func GetCommentsByURL(c *gin.Context) {
-	url := c.Param("url")
+	url := c.Query("url")
+	if url == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少 url 參數"})
+		return
+	}
 	var comments []models.Comment
 	if err := models.DB.Where("url = ?", url).Preload("User").Find(&comments).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "查詢留言失敗: " + err.Error()})
@@ -130,13 +167,8 @@ func GetCommentsByURL(c *gin.Context) {
 func ToggleCommentLike(c *gin.Context) {
 	commentID := c.Param("id")
 
-	// 取得目前登入的使用者
-	userInterface, exists := c.Get("currentUser")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "使用者未登入"})
-		return
-	}
-	user := userInterface.(models.User)
+	// 驗證使用者是否登入
+	user := c.MustGet("currentUser").(models.User)
 
 	// 檢查留言是否存在
 	var comment models.Comment

@@ -22,17 +22,19 @@ func SetupRouter() *gin.Engine {
 	authGroup.Use(middleware.JWTAuth())
 
 	// Comment routes
-	authGroup.GET("/comments", controllers.GetComments)
-	authGroup.POST("/comments", controllers.CreateComment)
-	authGroup.GET("/comments/:id", controllers.GetCommentByID)
-	authGroup.DELETE("/comments/:id", controllers.DeleteComment)
+	comments := authGroup.Group("/comments")
+	{
+		comments.GET("", controllers.GetComments)            // GET /api/v1/comments/
+		comments.POST("", controllers.CreateComment)         // POST /api/v1/comments/
+		comments.GET("/by-url", controllers.GetCommentsByURL) // GET /api/v1/comments/by-url?url=xxx
+		comments.GET("/:id", controllers.GetCommentByID)      // GET /api/v1/comments/:id
+		comments.PUT("/:id", controllers.UpdateComment)       // PUT /api/v1/comments/:id
+		comments.DELETE("/:id", controllers.DeleteComment)    // DELETE /api/v1/comments/:id
 
-	// Like routes
-	authGroup.POST("/comments/:id/like", controllers.ToggleCommentLike)
-	authGroup.GET("/comments/:id/likes", controllers.GetCommentLikes)
-
-	// Get comments by URL
-	authGroup.GET("/comments/:url", controllers.GetCommentsByURL)
+		// Like routes
+		comments.POST("/:id/like", controllers.ToggleCommentLike) // POST /api/v1/comments/:id/like
+		comments.GET("/:id/likes", controllers.GetCommentLikes)   // GET /api/v1/comments/:id/likes
+	}
 
 	// Test route
 	r.GET("/", func(c *gin.Context) {
