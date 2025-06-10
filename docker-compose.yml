@@ -1,16 +1,6 @@
 version: '3.8'
 
 services:
-  # Nginx 服務
-  nginx:
-    image: nginx:alpine
-    container_name: messageboard-nginx
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - 
-
   # PostgreSQL 數據庫服務
   postgres:
     image: postgres:latest
@@ -52,6 +42,8 @@ services:
       AUTHOR_USERNAME: ${AUTHOR_USERNAME}
       AUTHOR_EMAIL: ${AUTHOR_EMAIL}
       AUTHOR_PASSWORD: ${AUTHOR_PASSWORD}
+      # 域名限制
+      ALLOWED_DOMAINS: ${ALLOWED_DOMAINS}
       # 郵件配置（可選）
       MAIL_HOST: ${MAIL_HOST}
       MAIL_PORT: ${MAIL_PORT}

@@ -58,7 +58,8 @@ func InitDB() {
 	// 載入 .env 檔案
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("無法載入 .env 檔案：", err)
+		log.Println("警告：無法載入 .env 檔案，將使用系統環境變數")
+		// 不要 Fatal，繼續執行
 	}
 
 	// 讀取環境變數
