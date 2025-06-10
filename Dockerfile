@@ -28,9 +28,6 @@ WORKDIR /root/
 # 從構建階段複製編譯好的二進制文件
 COPY --from=builder /app/messageboard .
 
-# 複製環境變數配置文件
-COPY .env .
-
 # 暴露應用端口
 EXPOSE 8080
 
