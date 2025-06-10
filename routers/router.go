@@ -10,7 +10,21 @@ import (
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
 
+	// 啟用 CORS 中介軟體
+	r.Use(func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*") // 或指定域名
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Origin, Authorization, Content-Type")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+		c.Next()
+	})
+
 	api := r.Group("/api")
+	r.Use(middleware.DomainRestriction())
 	v1 := api.Group("/v1")
 
 	// Public routes
@@ -24,8 +38,8 @@ func SetupRouter() *gin.Engine {
 	// Comment routes
 	comments := authGroup.Group("/comments")
 	{
-		comments.GET("", controllers.GetComments)            // GET /api/v1/comments/
-		comments.POST("", controllers.CreateComment)         // POST /api/v1/comments/
+		comments.GET("", controllers.GetComments)             // GET /api/v1/comments/
+		comments.POST("", controllers.CreateComment)          // POST /api/v1/comments/
 		comments.GET("/by-url", controllers.GetCommentsByURL) // GET /api/v1/comments/by-url?url=xxx
 		comments.GET("/:id", controllers.GetCommentByID)      // GET /api/v1/comments/:id
 		comments.PUT("/:id", controllers.UpdateComment)       // PUT /api/v1/comments/:id

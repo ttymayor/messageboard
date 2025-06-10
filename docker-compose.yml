@@ -1,6 +1,16 @@
 version: '3.8'
 
 services:
+  # Nginx 服務
+  nginx:
+    image: nginx:alpine
+    container_name: messageboard-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - 
+
   # PostgreSQL 數據庫服務
   postgres:
     image: postgres:latest

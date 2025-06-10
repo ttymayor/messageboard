@@ -4,6 +4,7 @@ import (
 	"errors"
 	"messageboard/models"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -12,6 +13,82 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+func getAllowedDomains() []string {
+	domains := os.Getenv("ALLOWED_DOMAINS")
+	return strings.Split(domains, ",")
+}
+
+// DomainRestriction 檢查請求來源是否為允許的域名
+func DomainRestriction() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 取得允許的域名列表
+		allowedDomains := getAllowedDomains()
+		if len(allowedDomains) == 0 {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "未設定允許的域名"})
+			c.Abort()
+			return
+		}
+
+		// 檢查 Origin 或 Referer 頭
+		origin := c.GetHeader("Origin")
+		referer := c.GetHeader("Referer")
+
+		// 優先使用 Origin，如果沒有再使用 Referer
+		source := origin
+		if source == "" {
+			source = referer
+		}
+
+		// 如果都沒有，拒絕請求
+		if source == "" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "無法確認請求來源"})
+			c.Abort()
+			return
+		}
+
+		// 解析 URL 獲取域名
+		parsedURL, err := url.Parse(source)
+		if err != nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": "無效的請求來源"})
+			c.Abort()
+			return
+		}
+
+		// 檢查域名是否在允許列表中
+		hostname := parsedURL.Hostname()
+		hostWithPort := parsedURL.Host
+		allowed := false
+
+		for _, domain := range allowedDomains {
+			// 檢查完整域名匹配
+			if domain == hostname || domain == hostWithPort {
+				allowed = true
+				break
+			}
+
+			// 檢查子域名匹配（允許 *.example.com）
+			if strings.HasPrefix(domain, "*.") {
+				baseDomain := domain[2:] // 去掉 "*."
+				if strings.HasSuffix(hostname, baseDomain) {
+					allowed = true
+					break
+				}
+			}
+		}
+
+		if !allowed {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error": "你似乎想 CSRF 攻擊我的後端ㄟ。",
+			})
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
+// 身分驗中介軟體，使用 JWT 進行授權
 func JWTAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 取得 Authorization 標頭

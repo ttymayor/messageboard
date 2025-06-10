@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>留言板</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .topbar {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #eee;
+        }
+        .user-info {
+            margin-right: 12px;
+            color: #555;
+        }
+        .auth-section {
+            display: none;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        .auth-form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: 300px;
+        }
+        .auth-form input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .auth-form button {
+            padding: 10px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .auth-form button:hover {
+            background: #0056b3;
+        }
+        .btn {
+            padding: 8px 16px;
+            margin-left: 8px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        #messageForm {
+            margin-bottom: 20px;
+        }
+        #messageForm input, #messageForm textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        #messageForm button {
+            background: #28a745;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .message {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 6px;
+            border-left: 4px solid #007bff;
+        }
+        .message .author {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .message .content {
+            color: #555;
+            margin-bottom: 8px;
+        }
+        .message .timestamp {
+            font-size: 12px;
+            color: #888;
+        }
+        .error {
+            color: #dc3545;
+            background: #f8d7da;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success {
+            color: #155724;
+            background: #d4edda;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="topbar">
+            <span class="user-info" id="userInfo">未登入</span>
+            <button id="showLoginBtn" class="btn btn-primary" style="display:none;">登入</button>
+            <button id="showRegisterBtn" class="btn btn-secondary" style="display:none;">註冊</button>
+            <button id="logoutBtn" class="btn btn-danger" style="display:none;">登出</button>
+        </div>
+
+        <!-- 登入表單 -->
+        <div id="loginSection" class="auth-section">
+            <h3>登入</h3>
+            <form id="loginForm" class="auth-form">
+                <input type="text" id="loginEmail" placeholder="使用者名稱" required>
+                <input type="password" id="loginPassword" placeholder="密碼" required>
+                <button type="submit">登入</button>
+                <button type="button" onclick="hideAuthSections()">取消</button>
+            </form>
+        </div>
+
+        <!-- 註冊表單 -->
+        <div id="registerSection" class="auth-section">
+            <h3>註冊</h3>
+            <form id="registerForm" class="auth-form">
+                <input type="text" id="registerUsername" placeholder="使用者名稱" required>
+                <input type="email" id="registerEmail" placeholder="電子郵件" required>
+                <input type="password" id="registerPassword" placeholder="密碼" required>
+                <button type="submit">註冊</button>
+                <button type="button" onclick="hideAuthSections()">取消</button>
+            </form>
+        </div>
+
+        <div id="messageArea">
+            <h1>留言板</h1>
+            <form id="messageForm" style="display:none;">
+                <input type="text" id="articleId" placeholder="文章 ID" required>
+                <textarea rows="3" id="content" placeholder="請輸入留言內容" required></textarea>
+                <button type="submit">送出留言</button>
+            </form>
+            <div class="messages" id="messages">
+                <!-- 留言會顯示在這裡 -->
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script>
+        const API_BASE = 'http://127.0.0.1:8080/api/v1';
+        let currentUser = null;
+        let authToken = null;
+
+        // 更新登入狀態
+        function updateLoginStatus() {
+            const token = localStorage.getItem('authToken');
+            const username = localStorage.getItem('username');
+            
+            const userInfo = document.getElementById('userInfo');
+            const showLoginBtn = document.getElementById('showLoginBtn');
+            const showRegisterBtn = document.getElementById('showRegisterBtn');
+            const logoutBtn = document.getElementById('logoutBtn');
+            const messageForm = document.getElementById('messageForm');
+
+            if (token && username) {
+                authToken = token;
+                currentUser = username;
+                userInfo.textContent = `已登入：${username}`;
+                showLoginBtn.style.display = 'none';
+                showRegisterBtn.style.display = 'none';
+                logoutBtn.style.display = '';
+                messageForm.style.display = 'block';
+            } else {
+                authToken = null;
+                currentUser = null;
+                userInfo.textContent = '未登入';
+                showLoginBtn.style.display = '';
+                showRegisterBtn.style.display = '';
+                logoutBtn.style.display = 'none';
+                messageForm.style.display = 'none';
+            }
+        }
+
+        // 顯示/隱藏驗證表單
+        function showAuthSection(sectionId) {
+            hideAuthSections();
+            document.getElementById(sectionId).style.display = 'block';
+        }
+
+        function hideAuthSections() {
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('registerSection').style.display = 'none';
+        }
+
+        // 顯示訊息
+        function showMessage(message, type = 'success') {
+            const messageArea = document.getElementById('messageArea');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = type;
+            msgDiv.textContent = message;
+            messageArea.insertBefore(msgDiv, messageArea.firstChild);
+            
+            setTimeout(() => {
+                msgDiv.remove();
+            }, 5000);
+        }
+
+        // 註冊
+        document.getElementById('registerForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('registerUsername').value;
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+
+            try {
+                const response = await axios.post(`${API_BASE}/register`, {
+                    username: username,
+                    email: email,
+                    password: password
+                });
+
+                showMessage('註冊成功！請登入');
+                hideAuthSections();
+                document.getElementById('registerForm').reset();
+            } catch (error) {
+                const errorMsg = error.response?.data?.error || '註冊失敗';
+                showMessage(errorMsg, 'error');
+            }
+        });
+
+        // 登入
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            try {
+                const response = await axios.post(`${API_BASE}/login`, {
+                    email: email,
+                    password: password
+                });
+
+                const token = response.data.token;
+                localStorage.setItem('authToken', token);
+                localStorage.setItem('username', email);
+                
+                showMessage('登入成功！');
+                hideAuthSections();
+                document.getElementById('loginForm').reset();
+                updateLoginStatus();
+                loadComments();
+            } catch (error) {
+                const errorMsg = error.response?.data?.error || '登入失敗';
+                showMessage(errorMsg, 'error');
+            }
+        });
+
+        // 登出
+        document.getElementById('logoutBtn').onclick = function() {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('username');
+            updateLoginStatus();
+            showMessage('已登出');
+            document.getElementById('messages').innerHTML = '';
+        };
+
+        // 按鈕事件
+        document.getElementById('showLoginBtn').onclick = () => showAuthSection('loginSection');
+        document.getElementById('showRegisterBtn').onclick = () => showAuthSection('registerSection');
+
+        // 送出留言
+        document.getElementById('messageForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            if (!authToken) {
+            showMessage('請先登入', 'error');
+            return;
+            }
+
+            const url = document.getElementById('articleId').value;
+            const content = document.getElementById('content').value;
+
+            try {
+            const response = await axios.post(`${API_BASE}/comments`, {
+                url: url,
+                content: content
+            }, {
+                headers: {
+                'Authorization': `Bearer ${authToken}`
+                }
+            });
+
+            showMessage('留言成功！');
+            document.getElementById('messageForm').reset();
+            loadComments();
+            } catch (error) {
+            const errorMsg = error.response?.data?.error || '送出留言失敗';
+            showMessage(errorMsg, 'error');
+            }
+        });
+
+        // 載入留言
+        async function loadComments() {
+            if (!authToken) return;
+
+            let url = document.getElementById('articleId').value;
+            // 如果沒有輸入 URL，使用當前網址
+            if (!url) {
+            url = window.location.href;
+            document.getElementById('articleId').value = url;
+            }
+
+            try {
+            const response = await axios.get(`${API_BASE}/comments?url=${encodeURIComponent(url)}`, {
+            headers: {
+            'Authorization': `Bearer ${authToken}`
+            }
+            });
+
+            const comments = response.data.comments;
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML = '';
+
+            if (comments && comments.length > 0) {
+            comments.forEach(function(comment) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'message';
+            msgDiv.innerHTML = `
+                <div class="author">${comment.user?.username || '匿名'}</div>
+                <div class="content">${comment.content}</div>
+                <div class="timestamp">${new Date(comment.created_at).toLocaleString()}</div>
+            `;
+            messagesDiv.appendChild(msgDiv);
+            });
+            } else {
+            messagesDiv.innerHTML = '<p>目前沒有留言</p>';
+            }
+            } catch (error) {
+            console.error('載入留言失敗', error);
+            showMessage('載入留言失敗', 'error');
+            }
+        }
+
+        // 初始化
+        updateLoginStatus();
+        if (authToken) {
+            loadComments();
+        }
+    </script>
+</body>
+</html>
