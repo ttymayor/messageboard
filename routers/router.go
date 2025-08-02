@@ -3,27 +3,33 @@ package routers
 import (
 	"messageboard/controllers"
 	middleware "messageboard/middlewares"
+	"os"
+	"strings"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
+
+func getAllowedOrigins() []string {
+	// 從環境變數讀取允許的來源
+	origins := os.Getenv("ALLOWED_ORIGINS")
+	if origins == "" {
+		// 開發環境預設值
+		return []string{"http://localhost:3000", "http://localhost:8080"}
+	}
+	return strings.Split(origins, ",")
+}
 
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
 
 	// 配置 CORS 中介軟體
 	r.Use(cors.New(cors.Config{
-		AllowOrigins: []string{
-			"http://localhost:3000", // 開發環境
-			"http://localhost:8080", // 開發環境
-			"https://ttymayor.com",
-			"https://www.ttymayor.com",
-			"https://blog.ttymayor.com",
-		},
+		AllowOrigins:     getAllowedOrigins(),
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type"},
 		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true, // 指定具體域名時可以啟用
+		AllowCredentials: true,
 	}))
 
 	api := r.Group("/api")
