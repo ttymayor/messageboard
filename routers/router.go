@@ -4,27 +4,29 @@ import (
 	"messageboard/controllers"
 	middleware "messageboard/middlewares"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
 
-	// 啟用 CORS 中介軟體
-	r.Use(func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*") // 或指定域名
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Origin, Authorization, Content-Type")
-
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
-		c.Next()
-	})
+	// 配置 CORS 中介軟體
+	r.Use(cors.New(cors.Config{
+		AllowOrigins: []string{
+			"http://localhost:3000", // 開發環境
+			"http://localhost:8080", // 開發環境
+			"https://ttymayor.com",
+			"https://www.ttymayor.com",
+			"https://blog.ttymayor.com",
+		},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true, // 指定具體域名時可以啟用
+	}))
 
 	api := r.Group("/api")
-	r.Use(middleware.DomainRestriction())
 	v1 := api.Group("/v1")
 
 	// Public routes
