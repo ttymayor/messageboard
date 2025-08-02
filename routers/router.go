@@ -39,23 +39,26 @@ func SetupRouter() *gin.Engine {
 	v1.POST("/register", controllers.Register)
 	v1.POST("/login", controllers.Login)
 
-	// Protected routes
+	// Public comment routes (不需要認證)
+	publicComments := v1.Group("/comments")
+	{
+		publicComments.GET("", controllers.GetComments)               // GET /api/v1/comments/
+		publicComments.GET("/by-url", controllers.GetCommentsByURL)   // GET /api/v1/comments/by-url?url=xxx
+		publicComments.GET("/:id", controllers.GetCommentByID)        // GET /api/v1/comments/:id
+		publicComments.GET("/:id/likes", controllers.GetCommentLikes) // GET /api/v1/comments/:id/likes
+	}
+
+	// Protected routes (需要認證)
 	authGroup := v1.Group("/")
 	authGroup.Use(middleware.JWTAuth())
 
-	// Comment routes
-	comments := authGroup.Group("/comments")
+	// Protected comment routes (需要認證的寫入操作)
+	protectedComments := authGroup.Group("/comments")
 	{
-		comments.GET("", controllers.GetComments)             // GET /api/v1/comments/
-		comments.POST("", controllers.CreateComment)          // POST /api/v1/comments/
-		comments.GET("/by-url", controllers.GetCommentsByURL) // GET /api/v1/comments/by-url?url=xxx
-		comments.GET("/:id", controllers.GetCommentByID)      // GET /api/v1/comments/:id
-		comments.PUT("/:id", controllers.UpdateComment)       // PUT /api/v1/comments/:id
-		comments.DELETE("/:id", controllers.DeleteComment)    // DELETE /api/v1/comments/:id
-
-		// Like routes
-		comments.POST("/:id/like", controllers.ToggleCommentLike) // POST /api/v1/comments/:id/like
-		comments.GET("/:id/likes", controllers.GetCommentLikes)   // GET /api/v1/comments/:id/likes
+		protectedComments.POST("", controllers.CreateComment)              // POST /api/v1/comments/
+		protectedComments.PUT("/:id", controllers.UpdateComment)           // PUT /api/v1/comments/:id
+		protectedComments.DELETE("/:id", controllers.DeleteComment)        // DELETE /api/v1/comments/:id
+		protectedComments.POST("/:id/like", controllers.ToggleCommentLike) // POST /api/v1/comments/:id/like
 	}
 
 	// Test route
