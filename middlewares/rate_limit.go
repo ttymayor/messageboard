@@ -66,7 +66,10 @@ func getClient(ip string) *rate.Limiter {
 	return limiter
 }
 
+var cleanerGoroutine sync.Once
+
 func RateLimitPerIP() gin.HandlerFunc {
+	cleanerGoroutine.Do(func() {
 		go func() {
 			ticker := time.NewTicker(5 * time.Minute)
 			defer ticker.Stop()
@@ -76,6 +79,7 @@ func RateLimitPerIP() gin.HandlerFunc {
 				clientMap.Gc()
 			}
 		}()
+	})
 
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
