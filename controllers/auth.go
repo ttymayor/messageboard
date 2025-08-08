@@ -38,7 +38,7 @@ func Register(c *gin.Context) {
 	// 密碼加密
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "密碼加密失敗"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "大密碼大失敗"})
 		return
 	}
 
@@ -92,7 +92,7 @@ func Login(c *gin.Context) {
 	claims := models.AppClaims{ // 使用自訂 struct
 		UserID: user.ID,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(72 * time.Hour)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(8 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
 			// Issuer:    "your_app_name", // 可選

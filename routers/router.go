@@ -32,6 +32,9 @@ func SetupRouter() *gin.Engine {
 		AllowCredentials: true,
 	}))
 
+	// IP 限流
+	r.Use(middleware.RateLimitPerIP())
+
 	api := r.Group("/api")
 	v1 := api.Group("/v1")
 

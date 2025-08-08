@@ -19,54 +19,29 @@
 1. 確保已有 `Golang` 環境
 2. 複製一份 `.env.example` 重新命名為 `.env` 並配置其中訊息
 3. 啟動
-    ```
-    go run .
-    ```
+   ```
+   go run .
+   ```
 
 ### 使用方法二：使用 Docker
 
 1. 確保已安裝 `Docker` 和 `Docker Compose`
 2. 複製一份 `.env.example` 重新命名為 `.env` 並配置其中訊息
 3. 使用 Docker Compose 啟動應用
-    ```
-    docker-compose up -d
-    ```
+   ```
+   docker-compose up -d
+   ```
 4. 應用將在 `http://localhost:8080` 運行
-
-### 檔案結構
-
-```
-.
-│   .env.example
-│   .gitignore
-│   docker-compose.yml
-│   Dockerfile
-│   go.mod
-│   go.sum
-│   main.go
-│   README.md
-│
-├───controllers
-│       auth.go
-│       comment.go
-│
-├───middlewares
-│       middleware.go
-│
-├───models
-│       auth.go
-│       model.go
-│
-└───routers
-        router.go
-```
 
 ### 使用套件
 
+- CORS 跨站處理: github.com/gin-contrib/cors
+- 登入驗證機制: github.com/golang-jwt/jwt/v5
 - Email Feature: github.com/xhit/go-simple-mail/v2
 - 後端處理: github.com/gin-gonic/gin
 - 環境變數: github.com/joho/godotenv
-- PostgreSQL 連接: github.com/lib/pq
+- 資料庫操作: gorm.io/gorm
+- PostgreSQL 連接: gorm.io/driver/postgres
 
 ## To-Do
 
