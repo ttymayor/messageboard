@@ -59,7 +59,8 @@
 - [x] ~~支援篩選每篇文章的留言~~ (Done)
 - [x] ~~支援點讚~~ (Done)
 - [x] ~~支援編輯留言~~ (Done)
-- [x] ~~防 CSRF，中介層判斷許可來源~~ (Done)
+- [x] ~~防 CSRF，使用 github.com/gin-contrib/cors 套件防跨站請求~~ (Done)
+- [x] ~~限制速率，使用 golang.org/x/time/rate 中介層~~ (Done)
 - [ ] 支援隱藏留言
 - [ ] 支援檢舉留言
 - [ ] 支援不接收 Email 通知
